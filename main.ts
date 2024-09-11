@@ -1,134 +1,273 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import * as CodeMirror from "codemirror";
+import { count } from 'console';
 
 // Remember to rename these classes and interfaces!
 
-interface MyPluginSettings {
-	mySetting: string;
-}
+const ruToEn: Record<string, string>  = {
+	'ё': '`',
+	'Ё': '~',
+	'"': '@',
+	'№': '#',
+	';': '$',
+	':': '^',
+	'?': '&',
+	'й': 'q',
+	'Й': 'Q',
+	'ц': 'w',
+	'Ц': 'W',
+	'у': 'e',
+	'У': 'E',
+	'к': 'r',
+	'К': 'R',
+	'е': 't',
+	'Е': 'T',
+	'н': 'y',
+	'Н': 'Y',
+	'г': 'u',
+	'Г': 'U',
+	'ш': 'i',
+	'Ш': 'I',
+	'щ': 'o',
+	'Щ': 'O',
+	'з': 'p',
+	'З': 'P',
+	'х': '[',
+	'Х': '{',
+	'ъ': ']',
+	'Ъ': '}',
+	'/': '|',
+	'ф': 'a',
+	'Ф': 'A',
+	'ы': 's',
+	'Ы': 'S',
+	'в': 'd',
+	'В': 'D',
+	'а': 'f',
+	'А': 'F',
+	'п': 'g',
+	'П': 'G',
+	'р': 'h',
+	'Р': 'H',
+	'о': 'j',
+	'О': 'J',
+	'л': 'k',
+	'Л': 'K',
+	'д': 'l',
+	'Д': 'L',
+	'ж': ';',
+	'Ж': ':',
+	'э': '\'',
+	'Э': '"',
+	'я': 'z',
+	'Я': 'Z',
+	'ч': 'x',
+	'Ч': 'X',
+	'с': 'c',
+	'С': 'C',
+	'м': 'v',
+	'М': 'V',
+	'и': 'b',
+	'И': 'B',
+	'т': 'n',
+	'Т': 'N',
+	'ь': 'm',
+	'Ь': 'M',
+	'б': ',',
+	'Б': '<',
+	'ю': '.',
+	'Ю': '>',
+	'.': '/',
+	',': '?',
+};
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
-}
+const enToRu: Record<string, string> = {
+	'`': 'ё',
+	'~': 'Ё',
+	'@': '"',
+	'#': '№',
+	'$': ';',
+	'^': ':',
+	'&': '?',
+	'q': 'й',
+	'Q': 'Й',
+	'w': 'ц',
+	'W': 'Ц',
+	'e': 'у',
+	'E': 'У',
+	'r': 'к',
+	'R': 'К',
+	't': 'е',
+	'T': 'Е',
+	'y': 'н',
+	'Y': 'Н',
+	'u': 'г',
+	'U': 'Г',
+	'i': 'ш',
+	'I': 'Ш',
+	'o': 'щ',
+	'O': 'Щ',
+	'p': 'з',
+	'P': 'З',
+	'[': 'х',
+	'{': 'Х',
+	']': 'ъ',
+	'}': 'Ъ',
+	'|': '/',
+	'a': 'ф',
+	'A': 'Ф',
+	's': 'ы',
+	'S': 'Ы',
+	'd': 'в',
+	'D': 'В',
+	'f': 'а',
+	'F': 'А',
+	'g': 'п',
+	'G': 'П',
+	'h': 'р',
+	'H': 'Р',
+	'j': 'о',
+	'J': 'О',
+	'k': 'л',
+	'K': 'Л',
+	'l': 'д',
+	'L': 'Д',
+	';': 'ж',
+	':': 'Ж',
+	'\'': 'э',
+	'"': 'Э',
+	'z': 'я',
+	'Z': 'Я',
+	'x': 'ч',
+	'X': 'Ч',
+	'c': 'с',
+	'C': 'С',
+	'v': 'м',
+	'V': 'М',
+	'b': 'и',
+	'B': 'И',
+	'n': 'т',
+	'N': 'Т',
+	'm': 'ь',
+	'M': 'Ь',
+	',': 'б',
+	'<': 'Б',
+	'.': 'ю',
+	'>': 'Ю',
+	'/': '.',
+	'?': ',',
+};
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+const specialSymbol = ['/', '']
+
+
+export default class TranslateKeyboard extends Plugin {
 
 	async onload() {
-		await this.loadSettings();
-
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
 
 		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
+			id: 'translating-keyboard',
+			name: 'Translating keyboard from selection',
+			callback: () => this.TranslateBlock()
 		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
 
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
+		this.addCommand({
+			id: 'translating-to-ru',
+			name: 'Translating keyboard to Ru from selection',
+			callback: () => this.TranslateBlockToRu()
+		});
+
+		this.addCommand({
+			id: 'translating-to-en',
+			name: 'Translating keyboard to En from selection',
+			callback: () => this.TranslateBlockToEn()
+		});
+	}
+
+
+	TranslateBlock(): void {
+		let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (activeView) {
+			let editor = activeView.editor;
+			let selectedText = editor.getSelection();
+			let text = '';
+			let controlChars = [selectedText.charAt(0), selectedText.charAt(selectedText.length-1), selectedText.charAt(selectedText.length / 2 >> 0)];
+			let countRu = 0;
+			let countEn = 0;
+			for (let i = 0; i < controlChars.length; i++) {
+				if (controlChars[i] in ruToEn && countEn == 0) {
+					countRu++;
 				}
+				else if (controlChars[i] in enToRu) {
+					countEn++;
+				}
+			};
+			if (countRu == 3) {
+				Array.from(selectedText).forEach(char => {
+					if (char in ruToEn) {
+						text = text + ruToEn[char]
+					}
+					else {
+						text = text + char
+					}
+				});
 			}
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+			else if (countEn == 3){
+				Array.from(selectedText).forEach(char => {
+					if (char in enToRu) {
+						text = text + enToRu[char]
+					}
+					else {
+						text = text + char
+					}
+				});
+			}
+			else {
+				alert('The keyboard layout could not be determined (Available layouts: Ru, En)');
+				alert('Use the "translate keyboard layout to EN/EN" commands')
+				return;
+			};
+			
+			editor.replaceSelection(`${text}`)
+		}
 	}
 
-	onunload() {
-
+	TranslateBlockToRu(): void {
+		let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (activeView) {
+			let editor = activeView.editor;
+			let selectedText = editor.getSelection();
+			let text = '';
+			Array.from(selectedText).forEach(char => {
+				if (char in enToRu) {
+					text = text + enToRu[char]
+				}
+				else {
+					text = text + char
+				}
+			});
+			
+			editor.replaceSelection(`${text}`)
+		}
 	}
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
-}
-
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		const {containerEl} = this;
-
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
+	TranslateBlockToEn(): void {
+		let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (activeView) {
+			let editor = activeView.editor;
+			let selectedText = editor.getSelection();
+			let text = '';
+			Array.from(selectedText).forEach(char => {
+				if (char in ruToEn) {
+					text = text + ruToEn[char]
+				}
+				else {
+					text = text + char
+				}
+			});
+			
+			editor.replaceSelection(`${text}`)
+		}
 	}
 }
